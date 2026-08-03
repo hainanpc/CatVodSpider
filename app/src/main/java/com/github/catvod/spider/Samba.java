@@ -16,10 +16,10 @@ import com.hierynomus.smbj.share.DiskShare;
 public class Samba extends Spider {
     
     // ==========================================
-    // 💡 已按照您的要求：写死为您家里的真实局域网配置
+    // 💡 您的真实局域网免密配置：IP=192.168.2.1，文件夹=mine
     // ==========================================
-    private static final String SMB_IP = "192.168.2.1";       // 您的路由器或电脑内网IP
-    private static final String SHARE_NAME = "mine";         // 您的免密共享文件夹名称
+    private static final String SMB_IP = "192.168.2.1";       
+    private static final String SHARE_NAME = "mine";         
 
     @Override
     public void init(Context context, String ext) {
@@ -39,7 +39,7 @@ public class Samba extends Spider {
             classes.put(clz);
             result.put("class", classes);
             
-            // 2. 核心：通过新版内置的 smbj 库，动态扫描免密共享文件夹
+            // 2. 通过 smbj 库动态扫描免密共享文件夹
             JSONArray list = new JSONArray();
             SMBClient client = new SMBClient();
             
@@ -60,9 +60,9 @@ public class Samba extends Spider {
                         vod.put("vod_id", name); // 将真实文件名作为ID传递
                         vod.put("vod_name", name); // 在电视屏幕上显示真实电影名称
                         
-                        // 判断是文件夹还是普通视频文件（16代表文件夹属性）
+                        // 💡 核心修复点：全面统一改用标准合规的 .put() 语法，彻底消除编译报错
                         if (f.getFileAttributes() == 16) {
-                            vod.setVodPic("https://icons8.com");
+                            vod.put("vod_pic", "https://icons8.com");
                             vod.put("vod_remarks", "文件夹");
                         } else {
                             vod.put("vod_pic", "https://icons8.com");
