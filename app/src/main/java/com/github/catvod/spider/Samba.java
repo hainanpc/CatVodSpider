@@ -90,8 +90,17 @@ public class Samba extends Spider {
     }
 
     @Override
-    public String categoryContent(String tid, String pg, boolean filter, Object extend) {
+    public String homeVideoContent() {
+        return scanDirectory("");
+    }
+
+    @Override
+    public String categoryContent(String tid, String pg, boolean filter, java.util.HashMap<String, String> extend) {
         return scanDirectory(""); 
+    }
+
+    public String categoryContent(String tid, String pg, boolean filter, Object extend) {
+        return scanDirectory("");
     }
 
     @Override
@@ -115,7 +124,7 @@ public class Samba extends Spider {
             
             SMBClient client = new SMBClient();
             try (Connection connection = client.connect(SMB_IP)) {
-                AuthenticationContext ac = AuthenticationContext.anonymous();
+                AuthenticationContext ac = AuthenticationContext.authenticate(ac);
                 Session session = connection.authenticate(ac);
                 try (DiskShare share = (DiskShare) session.connectShare(SHARE_NAME)) {
                     
