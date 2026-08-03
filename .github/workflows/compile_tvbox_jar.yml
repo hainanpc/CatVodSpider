@@ -16,11 +16,10 @@ jobs:
 
     - name: 2. 优雅过滤：剔除不需要的爬虫文件
       run: |
-        # 1. 进入爬虫源码存放目录
+        # 进入爬虫源码存放目录
         cd app/src/main/java/com/github/catvod/spider
         
-        # 2. 除了关键的 Samba.java 之外，把其余所有不需要的 Java 源码删掉
-        # 这样官方的 build.sh 打包出来的就是我们想要的精简版
+        # 除了关键的 Samba.java 之外，把其余所有不需要的 Java 源码删掉
         find . -type f ! -name 'Samba.java' -delete
         echo "=== 过滤完成，当前源码目录留存文件 ==="
         ls -la
@@ -32,12 +31,11 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: 4. 赋予脚本执行权限
+    - name: 4. 赋予 Gradle 脚本执行权限
       run: |
         chmod +x gradlew
-        chmod +x build.sh
 
-    - name: 5. 触发编译并严格跳过单元测试
+    - name: 5. 触发编译并严格跳过单元测试与Lint检查
       # -x test 和 -x lint 用于强行跳过因删除了源码而导致的单元测试报错
       run: ./gradlew :app:assembleRelease -x test -x lint
 
