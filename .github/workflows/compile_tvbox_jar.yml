@@ -14,38 +14,54 @@ jobs:
     - name: 1. 检出仓库代码
       uses: actions/checkout@v4
 
-    - name: 2. 配置 JDK 17 环境
+    - name: 2. 物理剔除其他所有不需要的爬虫文件
+      run: |
+        # 1. 进入爬虫源码存放目录
+        cd app/src/main/java/com/github/catvod/spider
+        
+        # 2. 除了关键的 Samba.java 之外，把其余所有 Alist.java、Ali.java、Bili.java 等彻底在系统里删掉
+        # 这样 Gradle 编译时就压根看不到它们，自然不会把它们打进包里
+        find . -type f ! -name 'Samba.java' -delete
+        echo "=== 物理隔离完成，当前目录下留存的类文件如下 ==="
+        ls -la
+
+    - name: 3. 配置 JDK 17 环境
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: 3. 赋予 Gradle 脚本执行权限
+    - name: 4. 赋予 Gradle 脚本执行权限
       run: chmod +x gradlew
 
-    - name: 4. 全局预编译与专属精简打包
-      # 先整体触发一次 release 编译生成 classes 文件，紧接着提取打包 Samba
-      run: |
-        ./gradlew :app:assembleRelease
-        ./gradlew :app:makeJar
+    - name: 5. 运行官方原本的打包命令
+      # 因为我们在第2步把别的源码都扬了，此时官方原本的打包命令编译出来的就是纯净的极简包！
+      run: ./gradlew :app:assembleRelease
 
-    - name: 5. 转换并生成最终 DEX-Jar 产物
+    - name: 6. 转换并生成最终 DEX-Jar 产物
       run: |
         BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
         echo "使用 Android 编译工具链路径: $BUILD_TOOLS_DIR"
         
-        ORIGIN_JAR="app/build/spider.jar"
+        # 寻找官方编译生成的原始 classes.jar (新版路径通常在中间产物中)
+        ORIGIN_JAR=$(find app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/ -name "*.jar" | head -n 1)
         
-        if [ ! -f "$ORIGIN_JAR" ]; then
-          echo "❌ 错误：未在 app/build/ 中找到生成的 spider.jar，请检查编译日志！"
+        if [ -z "$ORIGIN_JAR" ]; then
+          # 备用路径查找
+          ORIGIN_JAR=$(find app/build/intermediates/ -name "classes.jar" | head -n 1)
+        fi
+        
+        if [ -z "$ORIGIN_JAR" ]; then
+          echo "❌ 错误：未找到生成的核心编译字节码包！"
           exit 1
         fi
         
+        # 使用 d8 工具将其转换为电视可用的 DEX 格式包
         $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar $ORIGIN_JAR
         echo "✅ DEX 格式转换成功！生成最终产物：tvbox_smb_spider.jar"
 
-    - name: 6. 上传编译产物到 GitHub 供下载
+    - name: 7. 上传编译产物到 GitHub 供下载
       uses: actions/upload-artifact@v4
       with:
         name: TVBox-SMB-Spider-Release
