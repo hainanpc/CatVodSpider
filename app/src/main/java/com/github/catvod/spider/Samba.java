@@ -16,8 +16,8 @@ public class Samba {
     // ==========================================
     // 💡 在这里直接写死你的局域网信息
     // ==========================================
-    private static final String SMB_IP = "192.168.1.100";      // 填你电脑的真实局域网 IP
-    private static final String SHARE_NAME = "Movies";         // 填你电脑的真实共享文件夹名称
+    private static final String SMB_IP = "192.168.2.1";      // 填你电脑的真实局域网 IP
+    private static final String SHARE_NAME = "mine";         // 填你电脑的真实共享文件夹名称
 
     // 官方统一的外部初始化通道，保持原样放行
     public void init(Context context, String ext) {
