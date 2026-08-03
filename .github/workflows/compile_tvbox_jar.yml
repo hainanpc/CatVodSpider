@@ -7,10 +7,16 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build and Package
       run: |
-        # 1. 过滤源码仅保留Samba并编译APK
+        # 1. 物理裁剪掉除Samba以外的源码文件
         find app/src/main/java/com/github/catvod/spider -type f ! -name 'Samba.java' -delete
+        
+        # 2. 赋予全局执行权限（核心修复点：防止 Permission Denied）
+        chmod +x gradlew
+        
+        # 3. 编译APK成品
         ./gradlew :app:assembleRelease
-        # 2. 物理裁剪APK生成Jar
+        
+        # 4. 直接利用APK解包重新封装为Jar产物
         APK_PATH=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
         unzip -q $APK_PATH -d temp_apk
         cd temp_apk && zip -r ../tvbox_smb_spider.jar .
