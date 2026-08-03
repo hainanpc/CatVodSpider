@@ -2,12 +2,12 @@ package com.github.catvod.spider;
 
 import android.content.Context;
 import com.github.catvod.crawler.Spider;
-import com.github.catvod.crawler.SpiderResult;
-import com.github.catvod.pojo.Vod;
-import com.github.catvod.pojo.Class;
+import com.github.catvod.net.OkHttp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
+import org.json.JSONObject;
+import org.json.JSONArray;
 
 public class Samba extends Spider {
     
@@ -24,25 +24,34 @@ public class Samba extends Spider {
 
     @Override
     public String homeContent(boolean filter) {
-        List<Class> classes = new ArrayList<>();
-        List<Vod> list = new ArrayList<>();
-        
-        // 创建主界面分类
-        classes.add(new Class("1", "局域网视频浏览"));
-        
-        // 💡 避开内网扫描报错：由于无法预测你电脑里的具体文件名，
-        // 我们直接在电视桌面上虚拟生成 4 个最常用的测试通道卡片。
-        // 你点击任意一个卡片，进去都能直接强制调用底层的串流通道。
-        for (int i = 1; i <= 5; i++) {
-            Vod vod = new Vod();
-            vod.setVodId("video_" + i + ".mp4"); 
-            vod.setVodName("局域网电影测试通道 " + i);
-            vod.setVodPic("https://icons8.com");
-            vod.setVodTag("超清本地流");
-            list.add(vod);
+        try {
+            JSONObject result = new JSONObject();
+            
+            // 1. 全新架构的分类注入：改用原生 JSONObject 组装，完美避开旧版 Class 类的缺失错误
+            JSONArray classes = new JSONArray();
+            JSONObject clz = new JSONObject();
+            clz.put("type_id", "1");
+            clz.put("type_name", "局域网视频浏览");
+            classes.put(clz);
+            result.put("class", classes);
+            
+            // 2. 注入局域网虚拟测试卡片列表
+            JSONArray list = new JSONArray();
+            for (int i = 1; i <= 5; i++) {
+                JSONObject vod = new JSONObject();
+                vod.put("vod_id", "video_" + i + ".mp4");
+                vod.put("vod_name", "局域网电影测试通道 " + i);
+                vod.put("vod_pic", "https://icons8.com");
+                vod.put("vod_remarks", "超清本地流");
+                list.put(vod);
+            }
+            result.put("list", list);
+            
+            return result.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        
-        return SpiderResult.string(classes, list);
+        return "";
     }
 
     @Override
@@ -52,20 +61,27 @@ public class Samba extends Spider {
 
     @Override
     public String detailContent(List<String> ids) {
-        String fileName = ids.get(0);
-        List<Vod> list = new ArrayList<>();
-        
-        Vod vod = new Vod();
-        vod.setVodId(fileName);
-        vod.setVodName(fileName);
-        vod.setVodPic("https://icons8.com");
-        vod.setVodPlayFrom("局域网直接解码");
-        
-        // 核心亮点：直接把绝对无错的内网共享路径硬塞给播放器，彻底切断中途的一切网络拦截！
-        String finalPlayUrl = "smb://" + SMB_IP + "/" + SHARE_NAME + "/" + fileName;
-        vod.setVodPlayUrl("立即播放$" + finalPlayUrl);
-        
-        list.add(vod);
-        return SpiderResult.string(list);
+        try {
+            String fileName = ids.get(0);
+            JSONObject result = new JSONObject();
+            JSONArray list = new JSONArray();
+            
+            JSONObject vod = new JSONObject();
+            vod.put("vod_id", fileName);
+            vod.put("vod_name", fileName);
+            vod.put("vod_pic", "https://icons8.com");
+            vod.put("vod_play_from", "局域网直接解码");
+            
+            // 核心强行注入：将绝对合规的 SMB 物理路径直接硬塞给播放器
+            String finalPlayUrl = "smb://" + SMB_IP + "/" + SHARE_NAME + "/" + fileName;
+            vod.put("vod_play_url", "立即播放$" + finalPlayUrl);
+            
+            list.put(vod);
+            result.put("list", list);
+            return result.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 }
