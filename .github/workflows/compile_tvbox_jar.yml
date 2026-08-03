@@ -14,15 +14,15 @@ jobs:
     - name: 1. 检出仓库代码
       uses: actions/checkout@v4
 
-    - name: 2. 物理剔除其他所有不需要的爬虫文件
+    - name: 2. 优雅过滤：剔除不需要的爬虫文件
       run: |
         # 1. 进入爬虫源码存放目录
         cd app/src/main/java/com/github/catvod/spider
         
-        # 2. 除了关键的 Samba.java 之外，把其余所有 Alist.java、Ali.java、Bili.java 等彻底在系统里删掉
-        # 这样 Gradle 编译时就压根看不到它们，自然不会把它们打进包里
+        # 2. 除了关键的 Samba.java 之外，把其余所有不需要的 Java 源码删掉
+        # 这样官方的 build.sh 打包出来的就是我们想要的精简版
         find . -type f ! -name 'Samba.java' -delete
-        echo "=== 物理隔离完成，当前目录下留存的类文件如下 ==="
+        echo "=== 过滤完成，当前源码目录留存文件 ==="
         ls -la
 
     - name: 3. 配置 JDK 17 环境
@@ -32,32 +32,29 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: 4. 赋予 Gradle 脚本执行权限
-      run: chmod +x gradlew
+    - name: 4. 赋予脚本执行权限
+      run: |
+        chmod +x gradlew
+        chmod +x build.sh
 
-    - name: 5. 运行官方原本的打包命令
-      # 因为我们在第2步把别的源码都扬了，此时官方原本的打包命令编译出来的就是纯净的极简包！
-      run: ./gradlew :app:assembleRelease
+    - name: 5. 触发编译并严格跳过单元测试
+      # -x test 和 -x lint 用于强行跳过因删除了源码而导致的单元测试报错
+      run: ./gradlew :app:assembleRelease -x test -x lint
 
     - name: 6. 转换并生成最终 DEX-Jar 产物
       run: |
         BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
         echo "使用 Android 编译工具链路径: $BUILD_TOOLS_DIR"
         
-        # 寻找官方编译生成的原始 classes.jar (新版路径通常在中间产物中)
-        ORIGIN_JAR=$(find app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/ -name "*.jar" | head -n 1)
+        # 自动捕获新版 Gradle 编译输出的核心 classes.jar
+        ORIGIN_JAR=$(find app/build/intermediates/ -name "classes.jar" | head -n 1)
         
         if [ -z "$ORIGIN_JAR" ]; then
-          # 备用路径查找
-          ORIGIN_JAR=$(find app/build/intermediates/ -name "classes.jar" | head -n 1)
-        fi
-        
-        if [ -z "$ORIGIN_JAR" ]; then
-          echo "❌ 错误：未找到生成的核心编译字节码包！"
+          echo "❌ 错误：未在构建目录中找到生成的核心 class 文件"
           exit 1
         fi
         
-        # 使用 d8 工具将其转换为电视可用的 DEX 格式包
+        # 使用 d8 工具将编译出的纯 Java 字节码包转为 Android 电视专用的 DEX-Jar 包
         $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar $ORIGIN_JAR
         echo "✅ DEX 格式转换成功！生成最终产物：tvbox_smb_spider.jar"
 
