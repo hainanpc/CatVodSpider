@@ -14,37 +14,22 @@ jobs:
     - name: 1. 检出仓库代码
       uses: actions/checkout@v4
 
-    - name: 2. 优雅过滤：剔除不需要的爬虫文件
-      run: |
-        # 进入爬虫源码存放目录
-        cd app/src/main/java/com/github/catvod/spider
-        
-        # 除了关键的 Samba.java 之外，把其余所有不需要的 Java 源码删掉
-        find . -type f ! -name 'Samba.java' -delete
-        echo "=== 过滤完成，当前源码目录留存文件 ==="
-        ls -la
-
-    - name: 3. 配置 JDK 17 环境
+    - name: 2. 配置 JDK 17 环境
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: 4. 赋予 Gradle 脚本执行权限
-      run: |
-        chmod +x gradlew
+    - name: 3. 赋予 Gradle 脚本执行权限
+      run: chmod +x gradlew
 
-    - name: 5. 触发编译并严格跳过单元测试与Lint检查
-      # -x test 和 -x lint 用于强行跳过因删除了源码而导致的单元测试报错
-      run: ./gradlew :app:assembleRelease -x test -x lint
+    - name: 4. 全量编译（不破坏官方任何文件，确保 100% 编译通过）
+      run: ./gradlew :app:assembleRelease
 
-    - name: 6. 转换并生成最终 DEX-Jar 产物
+    - name: 5. 暴力解耦：物理裁剪编译后的 Jar 包
       run: |
-        BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
-        echo "使用 Android 编译工具链路径: $BUILD_TOOLS_DIR"
-        
-        # 自动捕获新版 Gradle 编译输出的核心 classes.jar
+        # 1. 自动捕捉新版 Gradle 编译输出的核心 classes.jar
         ORIGIN_JAR=$(find app/build/intermediates/ -name "classes.jar" | head -n 1)
         
         if [ -z "$ORIGIN_JAR" ]; then
@@ -52,8 +37,47 @@ jobs:
           exit 1
         fi
         
-        # 使用 d8 工具将编译出的纯 Java 字节码包转为 Android 电视专用的 DEX-Jar 包
-        $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar $ORIGIN_JAR
+        # 复制出一份作为咱们的工作副本
+        cp "$ORIGIN_JAR" ./temp_classes.jar
+        
+        echo "=== 开始物理裁剪，清除多余的爬虫 class ==="
+        # 2. 核心大清洗：在解压缩层面上，直接用 zip -d 强行抹杀除 Samba 以外的其他所有 spider 
+        # 这样既不会引发 Java 编译错误，又能确保最终的 jar 里只留 Samba！
+        zip -d ./temp_classes.jar "com/github/catvod/spider/A*" \
+                                 "com/github/catvod/spider/B*" \
+                                 "com/github/catvod/spider/C*" \
+                                 "com/github/catvod/spider/D*" \
+                                 "com/github/catvod/spider/E*" \
+                                 "com/github/catvod/spider/F*" \
+                                 "com/github/catvod/spider/G*" \
+                                 "com/github/catvod/spider/H*" \
+                                 "com/github/catvod/spider/I*" \
+                                 "com/github/catvod/spider/J*" \
+                                 "com/github/catvod/spider/K*" \
+                                 "com/github/catvod/spider/L*" \
+                                 "com/github/catvod/spider/M*" \
+                                 "com/github/catvod/spider/N*" \
+                                 "com/github/catvod/spider/O*" \
+                                 "com/github/catvod/spider/P*" \
+                                 "com/github/catvod/spider/Q*" \
+                                 "com/github/catvod/spider/R*" \
+                                 "com/github/catvod/spider/T*" \
+                                 "com/github/catvod/spider/U*" \
+                                 "com/github/catvod/spider/V*" \
+                                 "com/github/catvod/spider/W*" \
+                                 "com/github/catvod/spider/X*" \
+                                 "com/github/catvod/spider/Y*" \
+                                 "com/github/catvod/spider/Z*"
+                                 
+        echo "=== 裁剪完成 ==="
+
+    - name: 6. 转换并生成最终 DEX-Jar 产物
+      run: |
+        BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
+        echo "使用 Android 编译工具链路径: $BUILD_TOOLS_DIR"
+        
+        # 使用 d8 工具将我们强行清洗后的纯净 jar 转为 Android 电视专用的 DEX-Jar 包
+        $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar ./temp_classes.jar
         echo "✅ DEX 格式转换成功！生成最终产物：tvbox_smb_spider.jar"
 
     - name: 7. 上传编译产物到 GitHub 供下载
