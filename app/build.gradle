@@ -71,39 +71,39 @@ tasks.register('siteTest') {
     group = 'verification'
     dependsOn 'testDebugUnitTest'
 }
-// 注册专属的精简打包任务，只打包 Samba 相关内容
+// 注册专属的精简打包任务（全面适配 Gradle 8.x/9.x 的 .set() 强对象赋值规范）
 tasks.register('makeJar', Jar) {
     group = 'build'
     description = 'Only compile and pack Samba spider, exclude all others.'
     
-    archiveClassifier = ''
-    archiveBaseName = 'spider'
-    destinationDirectory = file("${project.layout.buildDirectory.get().asFile}")
+    // 全新现代化赋值语法
+    archiveClassifier.set('')
+    archiveBaseName.set('spider')
+    destinationDirectory.set(file("${project.layout.buildDirectory.get().asFile}"))
 
-    // 1. 编译后的 classes 根路径
+    // 1. 动态获取编译后的 classes 根路径
     def classesDir = "${project.layout.buildDirectory.get().asFile}/intermediates/javac/release/compileReleaseJavaWithJavac/classes"
 
-    // 2. 严格的包含和排除规则（核心隔离点）
+    // 2. 严格的包含和排除规则（物理隔离，只放行 Samba 文件）
     from(classesDir) {
-        // 必须保留的底层系统框架和核心工具类
         include 'com/github/catvod/crawler/**'
         include 'com/github/catvod/pojo/**'
         include 'com/github/catvod/utils/**'
         include 'com/github/catvod/net/**'
         
-        // 核心拦截：只放行 Samba.class，其余所有 Alist、Ali、Bili、Baidu 等全部丢弃不打包
+        // 核心锁定：只放行 Samba.class 及其可能存在的内部匿名类
         include 'com/github/catvod/spider/Samba.class'
-        include 'com/github/catvod/spider/Samba$*.class' // 包含可能存在的内部匿名类
+        include 'com/github/catvod/spider/Samba$*.class'
     }
 
-    // 3. 将第三方依赖库（如 smbj, jcifs 及其依赖的 asn1 等）打进胖包
+    // 3. 将第三方依赖打进包内
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     } {
-        // 排除第三方依赖包中无用的证书和说明文件，最大化压榨包体积
         exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/LICENSE*'
     }
 
     // 4. 让此任务必须在官方编译任务完成后执行
     dependsOn 'compileReleaseJavaWithJavac'
 }
+
