@@ -12,8 +12,8 @@ public class Samba extends Spider {
     // ==========================================
     // 💡 在这里直接写死你的局域网信息
     // ==========================================
-    private static final String SMB_IP = "192.168.1.100";      // 填你电脑的真实局域网 IP
-    private static final String SHARE_NAME = "Movies";         // 填你电脑的真实共享文件夹名称
+    private static final String SMB_IP = "192.168.2.1";      // 填你电脑的真实局域网 IP
+    private static final String SHARE_NAME = "mine";         // 填你电脑的真实共享文件夹名称
 
     @Override
     public void init(Context context, String ext) {
