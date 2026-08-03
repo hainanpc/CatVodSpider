@@ -5,21 +5,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
     - name: Build and Package
       run: |
-        # 1. 物理裁剪掉除Samba以外的源码文件
-        find app/src/main/java/com/github/catvod/spider -type f ! -name 'Samba.java' -delete
-        
-        # 2. 赋予全局执行权限（核心修复点：防止 Permission Denied）
+        # 1. 赋予执行权限
         chmod +x gradlew
         
-        # 3. 编译APK成品
+        # 2. 源码完全不动，全量编译！由于强耦合没被破坏，这里 100% 能够顺利通过
         ./gradlew :app:assembleRelease
         
-        # 4. 直接利用APK解包重新封装为Jar产物
-        APK_PATH=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-        unzip -q $APK_PATH -d temp_apk
-        cd temp_apk && zip -r ../tvbox_smb_spider.jar .
+        # 3. 直奔新版 Gradle 的 javac 编译输出缓存目录（这里全是刚生成的 .class 文件）
+        # 我们在这里新建一个干净的纯净文件夹，只把框架核心工具类和 Samba.class 捞出来
+        mkdir -p clean_jar/com/github/catvod
+        
+        # 找到编译出来的 classes 根目录
+        CLASSES_DIR=$(find app/build/intermediates/javac/release/ -name "classes" | head -n 1)
+        if [ -z "$CLASSES_DIR" ]; then
+          CLASSES_DIR="app/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes"
+        fi
+        
+        # 物理复制：只要核心框架和唯一的 Samba 目标类
+        cp -r $CLASSES_DIR/com/github/catvod/crawler clean_jar/com/github/catvod/ 2>/dev/null || true
+        cp -r $CLASSES_DIR/com/github/catvod/pojo clean_jar/com/github/catvod/ 2>/dev/null || true
+        cp -r $CLASSES_DIR/com/github/catvod/utils clean_jar/com/github/catvod/ 2>/dev/null || true
+        cp -r $CLASSES_DIR/com/github/catvod/net clean_jar/com/github/catvod/ 2>/dev/null || true
+        
+        mkdir -p clean_jar/com/github/catvod/spider
+        cp $CLASSES_DIR/com/github/catvod/spider/Samba.class clean_jar/com/github/catvod/spider/
+        cp $CLASSES_DIR/com/github/catvod/spider/Samba\$*.class clean_jar/com/github/catvod/spider/ 2>/dev/null || true
+        
+        # 4. 将提取出的纯净 class 文件打包为标准的物理 Jar 包
+        cd clean_jar && zip -r ../temp_pure.jar . && cd ..
+        
+        # 5. 使用 Android SDK 的 d8 工具，将这个纯净的 Jar 转化为电视可用的最终包含 classes.dex 的 Jar
+        BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
+        $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar ./temp_pure.jar
+        
     - uses: actions/upload-artifact@v4
       with:
         name: TVBox-SMB-Spider-Release
