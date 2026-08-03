@@ -2,10 +2,9 @@ package com.github.catvod.spider;
 
 import android.content.Context;
 import com.github.catvod.crawler.Spider;
-import com.github.catvod.net.OkHttp;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.HashMap;
+import java.util.Map;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
@@ -27,7 +26,7 @@ public class Samba extends Spider {
         try {
             JSONObject result = new JSONObject();
             
-            // 1. 全新架构的分类注入：改用原生 JSONObject 组装，完美避开旧版 Class 类的缺失错误
+            // 1. 全新架构的分类注入
             JSONArray classes = new JSONArray();
             JSONObject clz = new JSONObject();
             clz.put("type_id", "1");
@@ -55,7 +54,8 @@ public class Samba extends Spider {
     }
 
     @Override
-    public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+    public String categoryContent(String tid, String pg, boolean filter, Map<String, String> extend) {
+        // 核心修复点：将原来的 HashMap 改为标准的 Map，完美契合官方最新接口定义
         return homeContent(filter);
     }
 
