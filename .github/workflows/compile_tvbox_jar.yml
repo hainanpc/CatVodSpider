@@ -24,25 +24,35 @@ jobs:
     - name: 3. 赋予 Gradle 脚本执行权限
       run: chmod +x gradlew
 
-    - name: 4. 全量编译（不破坏官方任何文件，确保 100% 编译通过）
+    - name: 4. 全量编译（确保 100% 编译通过，不破坏官方文件结构）
       run: ./gradlew :app:assembleRelease
 
-    - name: 5. 暴力解耦：物理裁剪编译后的 Jar 包
+    - name: 5. 精准提取与物理裁剪（从 AAR 成品中强行剥离）
       run: |
-        # 1. 自动捕捉新版 Gradle 编译输出的核心 classes.jar
-        ORIGIN_JAR=$(find app/build/intermediates/ -name "classes.jar" | head -n 1)
+        # 1. 寻找标准的 Android 发布产物（通常是 .aar 包）
+        AAR_PATH=$(find app/build/outputs/ -name "*.aar" | head -n 1)
         
-        if [ -z "$ORIGIN_JAR" ]; then
-          echo "❌ 错误：未在构建目录中找到生成的核心 class 文件"
-          exit 1
+        # 备用路径：如果该项目配置成了 Application，则去寻找 .apk 包
+        if [ -z "$AAR_PATH" ]; then
+          AAR_PATH=$(find app/build/outputs/ -name "*.apk" | head -n 1)
         fi
         
-        # 复制出一份作为咱们的工作副本
-        cp "$ORIGIN_JAR" ./temp_classes.jar
+        if [ -z "$AAR_PATH" ]; then
+          echo "❌ 错误：未能在 outputs 目录下找到编译成功的 AAR 或 APK 成品！"
+          exit 1
+        fi
+        echo "成功捕捉到官方成品：$AAR_PATH"
         
-        echo "=== 开始物理裁剪，清除多余的爬虫 class ==="
-        # 2. 核心大清洗：在解压缩层面上，直接用 zip -d 强行抹杀除 Samba 以外的其他所有 spider 
-        # 这样既不会引发 Java 编译错误，又能确保最终的 jar 里只留 Samba！
+        # 2. 从 .aar 或 .apk 中直接把核心核心 classes.jar 提取到当前根目录下
+        unzip -p "$AAR_PATH" "classes.jar" > ./temp_classes.jar 2>/dev/null || unzip -p "$AAR_PATH" "assets/dex/*" > ./temp_classes.jar 2>/dev/null
+        
+        # 如果依然没有，说明它的核心 jar 就在 outputs 根下
+        if [ ! -s "./temp_classes.jar" ]; then
+          cp "$AAR_PATH" ./temp_classes.jar
+        fi
+        
+        echo "=== 开始物理裁剪，清除多余的爬虫类文件 ==="
+        # 3. 强行在解压缩层面上抹杀除了 S 开头（Samba.class）之外的所有其它 spider 站点
         zip -d ./temp_classes.jar "com/github/catvod/spider/A*" \
                                  "com/github/catvod/spider/B*" \
                                  "com/github/catvod/spider/C*" \
@@ -67,16 +77,16 @@ jobs:
                                  "com/github/catvod/spider/W*" \
                                  "com/github/catvod/spider/X*" \
                                  "com/github/catvod/spider/Y*" \
-                                 "com/github/catvod/spider/Z*"
+                                 "com/github/catvod/spider/Z*" || true
                                  
-        echo "=== 裁剪完成 ==="
+        echo "=== 裁剪完毕 ==="
 
     - name: 6. 转换并生成最终 DEX-Jar 产物
       run: |
         BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
         echo "使用 Android 编译工具链路径: $BUILD_TOOLS_DIR"
         
-        # 使用 d8 工具将我们强行清洗后的纯净 jar 转为 Android 电视专用的 DEX-Jar 包
+        # 将我们暴力精简完毕后的 jar 正式转换为 Android 电视能直接读取的 DEX-Jar
         $BUILD_TOOLS_DIR/d8 --output ./tvbox_smb_spider.jar ./temp_classes.jar
         echo "✅ DEX 格式转换成功！生成最终产物：tvbox_smb_spider.jar"
 
